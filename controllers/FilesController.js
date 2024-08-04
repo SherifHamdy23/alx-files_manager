@@ -153,10 +153,84 @@ async function getIndex(req, res) {
     res.status(200).send(files);
 }
 
+async function putPublish(req, res) {
+    const token = req.headers['x-token'];
+    const { db } = await DBClient.getInstance();
+    const fileId = req.params.id;
+    // check of the given token have a valid user Id
+    if (token) {
+        const user = await getUserByToken(token)
+        if (!user)
+           return Unauthorized(res);
+    } else
+        return Unauthorized(res);
+    var file = 0;
+    try {
+        file = await db.collection('files').findOne({
+            _id: new ObjectId(fileId)
+        });
+        file.id = file._id;
+        delete file._id;
+        if (!file)
+            return res.status(404).send({error: "Not found"});
+    } catch (err) {
+        return res.status(400).send({error: "Invalid file id"});
+    }
+    if (file) {
+        const updatedFile = await db.collection('files').findOneAndUpdate(
+            {_id: new ObjectId(fileId)},
+            {$set : {isPublic: true}},
+            { returnDocument: 'after'}
+        );
+        if (updatedFile.value == null && updatedFile.ok)
+            return res.status(200).send({id: fileId, ...file})
+        delete updatedFile.value._id;
+        return res.status(200).send({id: fileId, ...updatedFile.value})
+    }
+}
+
+async function putUnpublish(req, res) {
+    const token = req.headers['x-token'];
+    const { db } = await DBClient.getInstance();
+    const fileId = req.params.id;
+    // check of the given token have a valid user Id
+    if (token) {
+        const user = await getUserByToken(token)
+        if (!user)
+           return Unauthorized(res);
+    } else
+        return Unauthorized(res);
+    var file = 0;
+    try {
+        file = await db.collection('files').findOne({
+            _id: new ObjectId(fileId)
+        });
+        file.id = file._id;
+        delete file._id;
+        if (!file)
+            return res.status(404).send({error: "Not found"});
+    } catch (err) {
+        return res.status(400).send({error: "Invalid file id"});
+    }
+    if (file) {
+        const updatedFile = await db.collection('files').findOneAndUpdate(
+            {_id: new ObjectId(fileId)},
+            {$set : {isPublic: false}},
+            { returnDocument: 'after'}
+        );
+        if (updatedFile.value == null && updatedFile.ok)
+            return res.status(200).send({id: fileId, ...file})
+        delete updatedFile.value._id;
+        return res.status(200).send({id: fileId, ...updatedFile.value})
+    }
+}
+
 const FilesController = {
     postUpload,
     getShow,
-    getIndex
+    getIndex,
+    putPublish,
+    putUnpublish
 };
 
 export default FilesController;
