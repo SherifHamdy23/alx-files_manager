@@ -95,8 +95,68 @@ async function postUpload(req, res) {
     res.end();
 }
 
+async function getShow(req, res) {
+    const token = req.headers['x-token'];
+    const { db } = await DBClient.getInstance();
+
+    // check of the given token have a valid user Id
+    if (token) {
+        const user = await getUserByToken(token)
+        if (!user)
+           return Unauthorized(res);
+    } else
+        return Unauthorized(res);
+    var file = null;
+    var fileId;
+    try {
+        file = await db.collection('files').findOne({
+            _id: new ObjectId(req.params.id)
+        });
+        fileId = file._id;
+        delete file._id;
+    } catch (err) {
+        return res.status(400).send({error: "Invalid file id"});
+    }
+    if (file)
+        return res.status(200).send({id: fileId, ...file})
+    return res.status(404).send({error: "Not found"});
+}
+
+async function getIndex(req, res) {
+    const token = req.headers['x-token'];
+    const { db } = await DBClient.getInstance();
+
+    // check of the given token have a valid user Id
+    if (token) {
+        const user = await getUserByToken(token)
+        if (!user)
+           return Unauthorized(res);
+    } else
+        return Unauthorized(res);
+
+
+    const limit = 20;
+    const {
+        parentId = 0,
+        page = 0
+    } = req.query;
+    const files = await db.collection('files').aggregate([
+        {$match : {parentId:  parentId}},
+        {$skip: page * limit},
+        {$limit: limit},
+        {$replaceRoot: {
+                newRoot: {$mergeObjects: [{id: "$_id"}, "$$ROOT"]}
+            }
+        },
+        {$project: {_id: 0}}
+    ]).toArray()
+    res.status(200).send(files);
+}
+
 const FilesController = {
-    postUpload
+    postUpload,
+    getShow,
+    getIndex
 };
 
 export default FilesController;
