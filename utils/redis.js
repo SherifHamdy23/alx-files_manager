@@ -3,11 +3,7 @@ import { promisify } from 'util';
 
 class RedisClient {
   constructor() {
-    this.client = redis.createClient({
-      host: 'redis-13764.c241.us-east-1-4.ec2.redns.redis-cloud.com',
-      port: 13764,
-      password: 'CrOzAmLpmUUJTSoWmZene1x6eoDM5PJn',
-    });
+    this.client = redis.createClient();
     this.client.on('error', (err) => {
       console.error('Redis client failed to connect:', err.message || err.toString());
       this.connected = false;
