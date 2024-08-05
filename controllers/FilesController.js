@@ -172,6 +172,7 @@ async function putPublish(request, response) {
   }
   return response.send({
     id: file._id,
+    userId: file.userId,
     name: file.name,
     type: file.type,
     isPublic: file.isPublic,
@@ -198,6 +199,7 @@ async function putUnpublish(request, response) {
   }
   return response.send({
     id: file._id,
+    userId: file.userId,
     name: file.name,
     type: file.type,
     isPublic: file.isPublic,
