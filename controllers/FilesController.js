@@ -92,8 +92,55 @@ async function postUpload(req, res) {
   return null;
 }
 
+async function getShow(req, res) {
+  const token = req.headers['x-token'];
+  const { db } = await DBClient.getInstance();
+  const files = await db.collection('files');
+  const fileId = req.params.id;
+
+  // check of the given token have a valid user Id
+  if (token) {
+    const user = await getUserByToken(token);
+    if (!user) return Unauthorized(res);
+
+    try {
+      const file = await files.findOne({
+        _id: new ObjectId(fileId),
+        userId: user._id.toString(),
+      });
+      if (!file) return res.status(404).send({ error: 'Not found' });
+
+      return res.status(200).send({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
+    } catch (err) {
+      console.log(err);
+      return res.status(404).send({ error: 'Not found' });
+    }
+  }
+  return null;
+}
+
+async function getIndex(req, res) {
+  const token = req.headers['x-token'];
+
+  // check of the given token have a valid user Id
+  if (token) {
+    const user = await getUserByToken(token);
+    if (!user) return Unauthorized(res);
+  } else return Unauthorized(res);
+  return null;
+}
+
 const FilesController = {
   postUpload,
+  getShow,
+  getIndex,
 };
 
 export default FilesController;
