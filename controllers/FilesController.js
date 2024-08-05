@@ -154,23 +154,23 @@ async function getIndex(request, response) {
 }
 
 async function putPublish(request, response) {
-    const user = await getUserByToken(request.headers['x-token']);
-    if (!user) {
-      return response.status(401).json({ error: 'Unauthorized' });
+  const user = await getUserByToken(request.headers['x-token']);
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
+  }
+  const { db } = await DBClient.getInstance();
+  const { id } = request.params;
+  const files = db.collection('files');
+  const idObject = new ObjectId(id);
+  const newValue = { $set: { isPublic: true } };
+  const options = { returnOriginal: false };
+  files.findOneAndUpdate({ _id: idObject, userId: user._id }, newValue, options, (err, file) => {
+    if (!file.lastErrorObject.updatedExisting) {
+      return response.status(404).json({ error: 'Not found' });
     }
-    const { db } = await DBClient.getInstance();
-    const { id } = request.params;
-    const files = db.collection('files');
-    const idObject = new ObjectId(id);
-    const newValue = { $set: { isPublic: true } };
-    const options = { returnOriginal: false };
-    files.findOneAndUpdate({ _id: idObject, userId: user._id }, newValue, options, (err, file) => {
-      if (!file.lastErrorObject.updatedExisting) {
-        return response.status(404).json({ error: 'Not found' });
-      }
-      return response.status(200).json(file.value);
-    });
-    return null;
+    return response.status(200).json(file.value);
+  });
+  return null;
 }
 
 async function putUnpublish(request, response) {
