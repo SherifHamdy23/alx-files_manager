@@ -112,7 +112,10 @@ async function getShow(req, res) {
   } catch (err) {
     return res.status(400).send({ error: 'Invalid file id' });
   }
-  if (file) return res.status(200).send({ id: fileId, ...file });
+  if (file) {
+    delete file.localPath;
+    return res.status(200).send({ id: fileId, ...file });
+  }
   return res.status(404).send({ error: 'Not found' });
 }
 
@@ -132,7 +135,7 @@ async function getIndex(req, res) {
     page = 0,
   } = req.query;
   const files = await db.collection('files').aggregate([
-    { $match: { parentId } },
+    { $match: { parentId: parentId !== '0' ? parentId : 0 } },
     { $skip: page * limit },
     { $limit: limit },
     {
@@ -140,7 +143,7 @@ async function getIndex(req, res) {
         newRoot: { $mergeObjects: [{ id: '$_id' }, '$$ROOT'] },
       },
     },
-    { $project: { _id: 0 } },
+    { $project: { _id: 0, localPath: 0 } },
   ]).toArray();
   return res.status(200).send(files);
 }
@@ -165,7 +168,7 @@ async function putPublish(req, res) {
       return res.status(404).send({ error: 'Not found' });
     }
   } catch (err) {
-    return res.status(400).send({ error: 'Invalid file id' });
+    return res.status(404).send({ error: 'Not found' });
   }
   if (file) {
     const updatedFile = await db.collection('files').findOneAndUpdate(
