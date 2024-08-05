@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
+import isFolder from '../utils/FileUtils';
 
 const {
   FOLDER_PATH = '/tmp/files_manager',
@@ -92,8 +93,87 @@ async function postUpload(req, res) {
   return null;
 }
 
+async function getShow(req, res) {
+  const token = req.headers['x-token'];
+  const { db } = await DBClient.getInstance();
+  const files = await db.collection('files');
+  const fileId = req.params.id;
+
+  // check of the given token have a valid user Id
+  if (token) {
+    const user = await getUserByToken(token);
+    if (!user) return Unauthorized(res);
+
+    try {
+      const file = await files.findOne({
+        _id: new ObjectId(fileId),
+        userId: user._id.toString(),
+      });
+      if (!file) return res.status(404).send({ error: 'Not found' });
+
+      return res.status(200).send({
+        id: file._id,
+        userId: file.userId,
+        name: file.name,
+        type: file.type,
+        isPublic: file.isPublic,
+        parentId: file.parentId,
+      });
+    } catch (err) {
+      console.log(err);
+      return res.status(404).send({ error: 'Not found' });
+    }
+  }
+  return null;
+}
+
+async function getIndex(req, res) {
+  const token = req.headers['x-token'];
+  const { db } = await DBClient.getInstance();
+  const filesCollection = db.collection('files');
+  const {
+    parentId = 0,
+    page = '0',
+  } = req.query;
+  const limit = 20;
+
+  // check of the given token have a valid user Id
+  let user;
+  if (token) {
+    user = await getUserByToken(token);
+    if (!user) return Unauthorized(res);
+  } else return Unauthorized(res);
+  if (!isFolder(parentId)) return res.status(200).send([]);
+  const files = await filesCollection.aggregate([
+    {
+      $match: {
+        parentId: (parentId !== '0' ? parentId : 0),
+        userId: user._id.toString(),
+      },
+    },
+    { $skip: page * limit },
+    { $limit: limit },
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [{ id: '$_id' }, '$$ROOT'],
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        localPath: 0,
+      },
+    },
+  ]).toArray();
+  return res.status(200).send(files);
+}
+
 const FilesController = {
   postUpload,
+  getShow,
+  getIndex,
 };
 
 export default FilesController;
