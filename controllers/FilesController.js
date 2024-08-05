@@ -122,9 +122,9 @@ async function getIndex(request, response) {
   const files = dbClient.db.collection('files');
   let query;
   if (!parentId) {
-    query = { userId: user._id };
+    query = { userId: user._id.toString() };
   } else {
-    query = { userId: user._id, parentId: ObjectId(parentId) };
+    query = { userId: user._id.toString(), parentId };
   }
   files.aggregate(
     [
