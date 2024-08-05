@@ -135,8 +135,6 @@ async function getIndex(req, res) {
     parentId = 0,
     page = '0',
   } = req.query;
-  const limit = 20;
-  const NULL_ID = '000000000000000000000000';
   // check of the given token have a valid user Id
   let user;
   if (token) {
@@ -145,31 +143,41 @@ async function getIndex(req, res) {
   } else return Unauthorized(res);
   if (!isFolder(parentId)) return res.status(200).send([]);
 
-  const filesFilter = {
-    userId: user._id.toString(),
-    parentId: parentId === '0' ? 0 : new ObjectId(ObjectId.isValid(parentId) ? parentId : NULL_ID),
-  };
-  const files = await filesCollection.aggregate([
-    {
-      $match: filesFilter,
-    },
-    { $skip: page * limit },
-    { $limit: limit },
-    {
-      $replaceRoot: {
-        newRoot: {
-          $mergeObjects: [{ id: '$_id' }, '$$ROOT'],
+  const pageNum = page || 0;
+  let query;
+  if (!parentId) {
+    query = { userId: user._id };
+  } else {
+    query = { userId: user._id, parentId: ObjectId(parentId) };
+  }
+  filesCollection.aggregate(
+    [
+      { $match: query },
+      { $sort: { _id: -1 } },
+      {
+        $facet: {
+          metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
+          data: [{ $skip: 20 * parseInt(pageNum, 10) }, { $limit: 20 }],
         },
       },
-    },
-    {
-      $project: {
-        _id: 0,
-        localPath: 0,
-      },
-    },
-  ]).toArray();
-  return res.status(200).send(files);
+    ],
+  ).toArray((err, result) => {
+    if (result) {
+      const final = result[0].data.map((file) => {
+        const tmpFile = {
+          ...file,
+          id: file._id,
+        };
+        delete tmpFile._id;
+        delete tmpFile.localPath;
+        return tmpFile;
+      });
+      return res.status(200).json(final);
+    }
+    console.log('Error occured');
+    return res.status(404).json({ error: 'Not found' });
+  });
+  return null;
 }
 
 const FilesController = {
