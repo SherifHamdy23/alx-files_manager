@@ -122,14 +122,13 @@ async function getIndex(request, response) {
   const files = dbClient.db.collection('files');
   let query;
   if (!parentId) {
-    query = { userId: user._id.toString() };
+    query = { userId: user._id };
   } else {
-    query = { userId: user._id.toString(), parentId };
+    query = { userId: user._id, parentId: ObjectId(parentId) };
   }
   files.aggregate(
     [
       { $match: query },
-      { $sort: { _id: -1 } },
       {
         $facet: {
           metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
