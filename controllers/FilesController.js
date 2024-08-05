@@ -9,6 +9,30 @@ const {
   FOLDER_PATH = '/tmp/files_manager',
 } = process.env;
 
+const NULL_ID = Buffer.alloc(24, '0').toString('utf-8');
+const isValidId = (id) => {
+  const size = 24;
+  let i = 0;
+  const charRanges = [
+    [48, 57], // 0 - 9
+    [97, 102], // a - f
+    [65, 70], // A - F
+  ];
+  if (typeof id !== 'string' || id.length !== size) {
+    return false;
+  }
+  while (i < size) {
+    const c = id[i];
+    const code = c.charCodeAt(0);
+
+    if (!charRanges.some((range) => code >= range[0] && code <= range[1])) {
+      return false;
+    }
+    i += 1;
+  }
+  return true;
+};
+
 async function storeData(filePath, data) {
   try {
     // Ensure the directory exists
@@ -102,22 +126,19 @@ async function getShow(req, res) {
     user = await getUserByToken(token);
     if (!user) return Unauthorized(res);
   } else return Unauthorized(res);
+
   let file = null;
   let fileId;
-  try {
-    file = await db.collection('files').findOne({
-      _id: new ObjectId(req.params.id),
-      userId: user._id.toString(),
-    });
-    if (file) {
-      fileId = file._id;
-      delete file._id;
-      delete file.localPath;
-      return res.status(200).send({ id: fileId, ...file });
-    }
-  } catch (err) {
-    // console.log(err)
-    return res.status(404).send({ error: 'Not found' });
+
+  file = await db.collection('files').findOne({
+    _id: new ObjectId(isValidId(req.params.id) ? req.params.id : NULL_ID),
+    userId: isValidId(user._id.toString()) ? user._id.toString() : NULL_ID,
+  });
+  if (file) {
+    fileId = file._id;
+    delete file._id;
+    delete file.localPath;
+    return res.status(200).send({ id: fileId, ...file });
   }
   return res.status(404).send({ error: 'Not found' });
 }
@@ -134,14 +155,19 @@ async function getIndex(req, res) {
   } else return Unauthorized(res);
 
   const limit = 20;
-  const {
-    parentId = 0,
-    page = 0,
-  } = req.query;
+  let { parentId = 0 } = req.query;
+  const { page = 0 } = req.query;
+
+  if (parentId.toString() !== '0') {
+    parentId = (isValidId(parentId) ? parentId : NULL_ID);
+  } else {
+    parentId = 0;
+  }
+
   const files = await db.collection('files').aggregate([
     {
       $match: {
-        parentId: parentId !== '0' ? parentId : 0,
+        parentId,
         userId: user._id.toString(),
       },
     },
