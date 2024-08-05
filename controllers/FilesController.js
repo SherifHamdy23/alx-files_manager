@@ -129,16 +129,12 @@ async function getIndex(request, response) {
   files.aggregate(
     [
       { $match: query },
-      {
-        $facet: {
-          metadata: [{ $count: 'total' }, { $addFields: { page: parseInt(pageNum, 10) } }],
-          data: [{ $skip: 20 * parseInt(pageNum, 10) }, { $limit: 20 }],
-        },
-      },
+      { $skip: 20 * parseInt(pageNum, 10) },
+      { $limit: 20 },
     ],
   ).toArray((err, result) => {
     if (result) {
-      const final = result[0].data.map((file) => {
+      const final = result.map((file) => {
         const tmpFile = {
           ...file,
           id: file._id,
