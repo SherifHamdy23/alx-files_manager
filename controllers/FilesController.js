@@ -165,7 +165,7 @@ async function putPublish(request, response) {
     _id: new ObjectId(request.params.id),
   },
   { $set: { isPublic: true } },
-  { returnDocument: 'after' });
+  { returnOriginal: false });
 
   if (!file.lastErrorObject.updatedExisting) {
     return response.status(404).send({ error: 'Not found' });
@@ -192,7 +192,7 @@ async function putUnpublish(request, response) {
     _id: new ObjectId(request.params.id),
   },
   { $set: { isPublic: false } },
-  { returnDocument: 'after' }, (err, file) => {
+  { returnOriginal: false }, (err, file) => {
     if (!file.lastErrorObject.updatedExisting) {
       return response.status(404).send({ error: 'Not found' });
     }
