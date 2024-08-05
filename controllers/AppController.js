@@ -1,21 +1,21 @@
-import { DBClient } from '../utils/db';
+import dbClient from '../utils/db';
 import redisClient from '../utils/redis';
 
 async function getStatus(req, res) {
-  const { instance: dbclient } = await DBClient.getInstance();
-  res.status(200).send({ redis: redisClient.isAlive(), db: dbclient.isAlive() });
+  if (dbClient.isAlive() === false) {
+    await dbClient.connect();
+  }
+  res.status(200).json({ redis: redisClient.isAlive(), db: dbClient.isAlive() });
 }
 
 async function getStats(req, res) {
-  const { instance: dbclient } = await DBClient.getInstance();
-  let countUsers = 0;
-  let countFiles = 0;
-  if (dbclient.isAlive()) {
-    countUsers = await dbclient.nbUsers();
-    countFiles = await dbclient.nbFiles();
+  if (dbClient.isAlive() === false) {
+    await dbClient.connect();
   }
-
-  res.status(200).send({ users: countUsers, files: countFiles });
+  Promise.all([dbClient.nbUsers(), dbClient.nbFiles()])
+    .then(([usersCount, filesCount]) => {
+      res.status(200).json({ users: usersCount, files: filesCount });
+    });
 }
 const AppController = {
   getStatus,
