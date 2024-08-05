@@ -69,13 +69,13 @@ async function postUpload(req, res) {
     }
 
     // prepare data to be stored in the database
-    const userId = user._id.toString();
+    const userId = user._id;
     const fileData = {
       userId,
       name,
       type,
       isPublic,
-      parentId,
+      parentId: parentId !== 0 ? new ObjectId(parentId) : 0,
     };
     // storing the document in the database
     const filePath = `${FOLDER_PATH}/${uuidv4()}`;
@@ -105,7 +105,9 @@ async function getShow(request, response) {
   if (!file) {
     return response.status(404).json({ error: 'Not found' });
   }
-  return response.status(200).json(file);
+  delete file._id;
+  delete file.localPath;
+  return response.status(200).json({ id: fileId, ...file });
 }
 
 async function getIndex(request, response) {
@@ -136,8 +138,8 @@ async function getIndex(request, response) {
     if (result) {
       const final = result.map((file) => {
         const tmpFile = {
-          ...file,
           id: file._id,
+          ...file,
         };
         delete tmpFile._id;
         delete tmpFile.localPath;
@@ -151,10 +153,66 @@ async function getIndex(request, response) {
   return null;
 }
 
+async function putPublish(request, response) {
+  const user = await getUserByToken(request.headers['x-token']);
+  if (!user) return Unauthorized(response);
+
+  const { db } = await DBClient.getInstance();
+  const filesCollection = await db.collection('files');
+
+  const file = await filesCollection.findOneAndUpdate({
+    userId: user._id,
+    _id: new ObjectId(request.params.id),
+  },
+  { $set: { isPublic: true } },
+  { returnDocument: 'after' });
+
+  if (!file.lastErrorObject.updatedExisting) {
+    return response.status(404).send({ error: 'Not found' });
+  }
+  return response.status(200).send({
+    id: file._id,
+    userId: file.userId,
+    name: file.name,
+    type: file.type,
+    isPublic: file.isPublic,
+    parentId: file.parentId,
+  });
+}
+
+async function putUnpublish(request, response) {
+  const user = await getUserByToken(request.headers['x-token']);
+  if (!user) return Unauthorized(response);
+
+  const { db } = await DBClient.getInstance();
+  const filesCollection = await db.collection('files');
+
+  const file = await filesCollection.findOneAndUpdate({
+    userId: user._id,
+    _id: new ObjectId(request.params.id),
+  },
+  { $set: { isPublic: false } },
+  { returnDocument: 'after' });
+
+  if (!file.lastErrorObject.updatedExisting) {
+    return response.status(404).send({ error: 'Not found' });
+  }
+  return response.status(200).send({
+    id: file._id,
+    userId: file.userId,
+    name: file.name,
+    type: file.type,
+    isPublic: file.isPublic,
+    parentId: file.parentId,
+  });
+}
+
 const FilesController = {
   postUpload,
   getShow,
   getIndex,
+  putPublish,
+  putUnpublish,
 };
 
 export default FilesController;
