@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
-import isFolder from '../utils/FileUtils';
 
 const {
   FOLDER_PATH = '/tmp/files_manager',
@@ -127,30 +126,25 @@ async function getShow(req, res) {
   return null;
 }
 
-async function getIndex(req, res) {
-  const token = req.headers['x-token'];
-  const { db } = await DBClient.getInstance();
-  const filesCollection = db.collection('files');
+async function getIndex(request, response) {
+  const dbClient = await DBClient.getInstance();
+  const user = await getUserByToken(request.headers['x-token']);
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
+  }
   const {
-    parentId = 0,
-    page = '0',
-  } = req.query;
-  // check of the given token have a valid user Id
-  let user;
-  if (token) {
-    user = await getUserByToken(token);
-    if (!user) return Unauthorized(res);
-  } else return Unauthorized(res);
-  if (!isFolder(parentId)) return res.status(200).send([]);
-
+    parentId,
+    page,
+  } = request.query;
   const pageNum = page || 0;
+  const files = dbClient.db.collection('files');
   let query;
   if (!parentId) {
     query = { userId: user._id };
   } else {
     query = { userId: user._id, parentId: ObjectId(parentId) };
   }
-  filesCollection.aggregate(
+  files.aggregate(
     [
       { $match: query },
       { $sort: { _id: -1 } },
@@ -172,10 +166,10 @@ async function getIndex(req, res) {
         delete tmpFile.localPath;
         return tmpFile;
       });
-      return res.status(200).json(final);
+      return response.status(200).json(final);
     }
     console.log('Error occured');
-    return res.status(404).json({ error: 'Not found' });
+    return response.status(404).json({ error: 'Not found' });
   });
   return null;
 }
