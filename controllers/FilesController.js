@@ -92,38 +92,20 @@ async function postUpload(req, res) {
   return null;
 }
 
-async function getShow(req, res) {
-  const token = req.headers['x-token'];
-  const { db } = await DBClient.getInstance();
-  const files = await db.collection('files');
-  const fileId = req.params.id;
-
-  // check of the given token have a valid user Id
-  if (token) {
-    const user = await getUserByToken(token);
-    if (!user) return Unauthorized(res);
-
-    try {
-      const file = await files.findOne({
-        _id: new ObjectId(fileId),
-        userId: user._id.toString(),
-      });
-      if (!file) return res.status(404).send({ error: 'Not found' });
-
-      return res.status(200).send({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      });
-    } catch (err) {
-      console.log(err);
-      return res.status(404).send({ error: 'Not found' });
-    }
+async function getShow(request, response) {
+  const user = await getUserByToken(request.headers['x-token']);
+  const dbClient = await DBClient.getInstance();
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
   }
-  return null;
+  const fileId = request.params.id;
+  const files = dbClient.db.collection('files');
+  const idObject = new ObjectId(fileId);
+  const file = await files.findOne({ _id: idObject, userId: user._id });
+  if (!file) {
+    return response.status(404).json({ error: 'Not found' });
+  }
+  return response.status(200).json(file);
 }
 
 async function getIndex(request, response) {
