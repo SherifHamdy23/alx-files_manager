@@ -1,5 +1,5 @@
+import { v4 as uuidv4 } from 'uuid';
 import { ObjectId } from 'mongodb';
-import { v4 } from 'uuid';
 import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
@@ -8,7 +8,6 @@ import { DBClient } from '../utils/db';
 const {
   FOLDER_PATH = '/tmp/files_manager',
 } = process.env;
-const uuidv4 = v4;
 
 async function storeData(filePath, data) {
   try {
@@ -52,9 +51,14 @@ async function postUpload(req, res) {
     // if the parent is not the root, i need to check if parent exist
     // and if exist check type of the document
     if (parentId !== 0) {
-      const document = await db.collection('files').findOne({
-        _id: new ObjectId(parentId),
-      });
+      let document = null;
+      try {
+        document = await db.collection('files').findOne({
+          _id: new ObjectId(parentId),
+        });
+      } catch (err) {
+        return res.status(400).send({ error: 'Parent not found' });
+      }
       if (document) {
         if (document.type !== 'folder') {
           return res.status(400).send({ error: 'Parent is not a folder' });
@@ -66,7 +70,6 @@ async function postUpload(req, res) {
 
     // prepare data to be stored in the database
     const userId = user._id.toString();
-    const localPath = `${FOLDER_PATH}/${uuidv4()}`;
     const fileData = {
       userId,
       name,
@@ -75,17 +78,18 @@ async function postUpload(req, res) {
       parentId,
     };
     // storing the document in the database
-    const { insertedId: fileId } = await db.collection('files').insertOne({ ...fileData, localPath });
+    const filePath = `${FOLDER_PATH}/${uuidv4()}`;
+    const { insertedId: fileId } = await db.collection('files').insertOne({ ...fileData, localPath: filePath });
 
     // storing the data of the file in local disk
     if (type !== 'folder') {
-      if (!storeData(localPath, data)) {
+      if (!storeData(filePath, data)) {
         return res.status(400).send({ error: 'Something Wrong with Storing the file' });
       }
     }
     res.status(201).send({ id: fileId, ...fileData });
-  }
-  return Unauthorized(res);
+  } else return Unauthorized(res);
+  return null;
 }
 
 async function getShow(req, res) {
@@ -157,7 +161,9 @@ async function putPublish(req, res) {
     });
     file.id = file._id;
     delete file._id;
-    if (!file) return res.status(404).send({ error: 'Not found' });
+    if (!file) {
+      return res.status(404).send({ error: 'Not found' });
+    }
   } catch (err) {
     return res.status(400).send({ error: 'Invalid file id' });
   }
@@ -184,9 +190,7 @@ async function putUnpublish(req, res) {
   if (token) {
     const user = await getUserByToken(token);
     if (!user) return Unauthorized(res);
-  } else {
-    return Unauthorized(res);
-  }
+  } else return Unauthorized(res);
   let file = 0;
   try {
     file = await db.collection('files').findOne({
@@ -194,9 +198,7 @@ async function putUnpublish(req, res) {
     });
     file.id = file._id;
     delete file._id;
-    if (!file) {
-      return res.status(404).send({ error: 'Not found' });
-    }
+    if (!file) return res.status(404).send({ error: 'Not found' });
   } catch (err) {
     return res.status(400).send({ error: 'Invalid file id' });
   }
