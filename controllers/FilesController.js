@@ -170,7 +170,7 @@ async function putPublish(request, response) {
   if (!file) {
     return response.status(404).send({ error: 'Not found' });
   }
-  return response.send({
+  return response.status(200).send({
     id: file._id,
     userId: file.userId,
     name: file.name,
@@ -197,7 +197,7 @@ async function putUnpublish(request, response) {
   if (!file) {
     return response.status(404).send({ error: 'Not found' });
   }
-  return response.send({
+  return response.status(200).send({
     id: file._id,
     userId: file.userId,
     name: file.name,
