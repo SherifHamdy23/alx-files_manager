@@ -1,7 +1,6 @@
 import { getUserByToken, Missing, Unauthorized } from "../utils/authUtils";
 import { DBClient } from "../utils/db";
 import { v4 } from 'uuid';
-import dotenv from 'dotenv';
 import fs from 'fs';
 import path from "path";
 import { ObjectId } from "mongodb";
@@ -9,7 +8,7 @@ import { ObjectId } from "mongodb";
 
 const {
     FOLDER_PATH = '/tmp/files_manager'
-} = dotenv.config().parsed;
+} = process.env;
 const uuidv4 = v4;
 
 
@@ -225,12 +224,17 @@ async function putUnpublish(req, res) {
     }
 }
 
+async function getFile(req, res) {
+    return res.end();
+}
+
 const FilesController = {
     postUpload,
     getShow,
     getIndex,
     putPublish,
-    putUnpublish
+    putUnpublish,
+    getFile
 };
 
 export default FilesController;
