@@ -136,7 +136,7 @@ async function getIndex(req, res) {
     page = '0',
   } = req.query;
   const limit = 20;
-
+  const NULL_ID = '000000000000000000000000';
   // check of the given token have a valid user Id
   let user;
   if (token) {
@@ -146,9 +146,9 @@ async function getIndex(req, res) {
   if (!isFolder(parentId)) return res.status(200).send([]);
 
   const filesFilter = {
-      userId: user._id.toString(),
-    parentId: (parentId === '0' ? 0 : (ObjectId.isValid(parentId) ? new ObjectId(parentId) : 0)),
-};
+    userId: user._id.toString(),
+    parentId: parentId === '0' ? 0 : new ObjectId(ObjectId.isValid(parentId) ? parentId : NULL_ID),
+  };
   const files = await filesCollection.aggregate([
     {
       $match: filesFilter,
