@@ -167,7 +167,7 @@ async function putPublish(request, response) {
   { $set: { isPublic: true } },
   { returnDocument: 'after' });
 
-  if (!!file.lastErrorObject.updatedExisting) {
+  if (!file.lastErrorObject.updatedExisting) {
     return response.status(404).send({ error: 'Not found' });
   }
   return response.status(200).send({
