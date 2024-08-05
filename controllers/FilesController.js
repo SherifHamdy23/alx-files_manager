@@ -144,12 +144,14 @@ async function getIndex(req, res) {
     if (!user) return Unauthorized(res);
   } else return Unauthorized(res);
   if (!isFolder(parentId)) return res.status(200).send([]);
+
+  const filesFilter = {
+      userId: user._id.toString(),
+    parentId: (parentId === '0' ? 0 : (ObjectId.isValid(parentId) ? new ObjectId(parentId) : 0)),
+};
   const files = await filesCollection.aggregate([
     {
-      $match: {
-        parentId: (parentId !== '0' ? parentId : 0),
-        userId: user._id.toString(),
-      },
+      $match: filesFilter,
     },
     { $skip: page * limit },
     { $limit: limit },
