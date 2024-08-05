@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { ObjectId } from 'mongodb';
 import path from 'path';
 import fs from 'fs';
+import { contentType } from 'mime-types';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
 
@@ -193,12 +194,40 @@ async function putUnpublish(request, response) {
   return null;
 }
 
+async function getFile(req, res) {
+  const user = await getUserByToken(req.headers['x-token']);
+  const { db } = await DBClient.getInstance();
+  const files = db.collection('files');
+
+  const fileId = new ObjectId(req.params.id);
+  const file = await files.findOne({
+    _id: fileId,
+  });
+  if (!file) {
+    return res.status(404).send({ error: 'Not found' });
+  }
+  const isTheOwner = file.userId.toString() === (user ? user._id.toString() : null);
+
+  if (!file.isPublic && (!isTheOwner)) {
+    return res.status(404).send({ error: 'Not found' });
+  }
+  if (file.type === 'folder') {
+    return res.status(400).send({ error: 'A folder doesn\'t have content' });
+  }
+  if (!fs.existsSync(file.localPath)) {
+    return res.status(404).send({ error: 'Not found' });
+  }
+  res.setHeader('content-type', contentType(file.name));
+  return res.status(200).sendFile(file.localPath);
+}
+
 const FilesController = {
   postUpload,
   getShow,
   getIndex,
   putPublish,
   putUnpublish,
+  getFile,
 };
 
 export default FilesController;
