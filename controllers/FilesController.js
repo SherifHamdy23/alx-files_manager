@@ -4,7 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
-import { isFolder } from '../utils/FileUtils';
+import isFolder from '../utils/FileUtils';
 
 const {
   FOLDER_PATH = '/tmp/files_manager',
