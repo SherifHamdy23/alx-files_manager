@@ -4,7 +4,6 @@ import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
-import isFolder from '../utils/FileUtils';
 
 const {
   FOLDER_PATH = '/tmp/files_manager',
@@ -93,83 +92,63 @@ async function postUpload(req, res) {
   return null;
 }
 
-async function getShow(req, res) {
-  const token = req.headers['x-token'];
-  const { db } = await DBClient.getInstance();
-  const files = await db.collection('files');
-  const fileId = req.params.id;
-
-  // check of the given token have a valid user Id
-  if (token) {
-    const user = await getUserByToken(token);
-    if (!user) return Unauthorized(res);
-
-    try {
-      const file = await files.findOne({
-        _id: new ObjectId(fileId),
-        userId: user._id.toString(),
-      });
-      if (!file) return res.status(404).send({ error: 'Not found' });
-
-      return res.status(200).send({
-        id: file._id,
-        userId: file.userId,
-        name: file.name,
-        type: file.type,
-        isPublic: file.isPublic,
-        parentId: file.parentId,
-      });
-    } catch (err) {
-      console.log(err);
-      return res.status(404).send({ error: 'Not found' });
-    }
+async function getShow(request, response) {
+  const user = await getUserByToken(request.headers['x-token']);
+  const dbClient = await DBClient.getInstance();
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
   }
-  return null;
+  const fileId = request.params.id;
+  const files = dbClient.db.collection('files');
+  const idObject = new ObjectId(fileId);
+  const file = await files.findOne({ _id: idObject, userId: user._id });
+  if (!file) {
+    return response.status(404).json({ error: 'Not found' });
+  }
+  return response.status(200).json(file);
 }
 
-async function getIndex(req, res) {
-  const token = req.headers['x-token'];
-  const { db } = await DBClient.getInstance();
-  const filesCollection = db.collection('files');
+async function getIndex(request, response) {
+  const dbClient = await DBClient.getInstance();
+  const user = await getUserByToken(request.headers['x-token']);
+  if (!user) {
+    return response.status(401).json({ error: 'Unauthorized' });
+  }
   const {
-    parentId = 0,
-    page = '0',
-  } = req.query;
-  const limit = 20;
-
-  // check of the given token have a valid user Id
-  let user;
-  if (token) {
-    user = await getUserByToken(token);
-    if (!user) return Unauthorized(res);
-  } else return Unauthorized(res);
-  if (!isFolder(parentId)) return res.status(200).send([]);
-
-  const filesFilter = {
-      userId: user._id.toString(),
-    parentId: (parentId === '0' ? 0 : (ObjectId.isValid(parentId) ? new ObjectId(parentId) : 0)),
-};
-  const files = await filesCollection.aggregate([
-    {
-      $match: filesFilter,
-    },
-    { $skip: page * limit },
-    { $limit: limit },
-    {
-      $replaceRoot: {
-        newRoot: {
-          $mergeObjects: [{ id: '$_id' }, '$$ROOT'],
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        localPath: 0,
-      },
-    },
-  ]).toArray();
-  return res.status(200).send(files);
+    parentId,
+    page,
+  } = request.query;
+  const pageNum = page || 0;
+  const files = dbClient.db.collection('files');
+  let query;
+  if (!parentId) {
+    query = { userId: user._id };
+  } else {
+    query = { userId: user._id, parentId: ObjectId(parentId) };
+  }
+  files.aggregate(
+    [
+      { $match: query },
+      { $skip: 20 * parseInt(pageNum, 10) },
+      { $limit: 20 },
+    ],
+  ).toArray((err, result) => {
+    if (result) {
+      const final = result.map((file) => {
+        const tmpFile = {
+          ...file,
+          id: file._id,
+        };
+        delete tmpFile._id;
+        delete tmpFile.localPath;
+        return tmpFile;
+      });
+      return response.status(200).json(final);
+    }
+    console.log('Error occured');
+    return response.status(404).json({ error: 'Not found' });
+  });
+  return null;
 }
 
 const FilesController = {
