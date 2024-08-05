@@ -23,7 +23,7 @@ async function postNew(req, res) {
     email: data.email,
     password: hashPassword(data.password),
   });
-  return res.send({
+  return res.status(201).send({
     email: data.email,
     id: newUser.insertedId,
   });
