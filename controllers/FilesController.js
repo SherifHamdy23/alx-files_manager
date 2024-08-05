@@ -160,14 +160,14 @@ async function putPublish(request, response) {
   const { db } = await DBClient.getInstance();
   const filesCollection = await db.collection('files');
 
-  const { value: file } = await filesCollection.findOneAndUpdate({
+  const file = await filesCollection.findOneAndUpdate({
     userId: user._id,
     _id: new ObjectId(request.params.id),
   },
   { $set: { isPublic: true } },
   { returnDocument: 'after' });
 
-  if (!file) {
+  if (!!file.lastErrorObject.updatedExisting) {
     return response.status(404).send({ error: 'Not found' });
   }
   return response.status(200).send({
@@ -187,14 +187,14 @@ async function putUnpublish(request, response) {
   const { db } = await DBClient.getInstance();
   const filesCollection = await db.collection('files');
 
-  const { value: file } = await filesCollection.findOneAndUpdate({
+  const file = await filesCollection.findOneAndUpdate({
     userId: user._id,
     _id: new ObjectId(request.params.id),
   },
   { $set: { isPublic: false } },
   { returnDocument: 'after' });
 
-  if (!file) {
+  if (!file.lastErrorObject.updatedExisting) {
     return response.status(404).send({ error: 'Not found' });
   }
   return response.status(200).send({
