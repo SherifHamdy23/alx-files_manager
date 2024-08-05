@@ -4,6 +4,7 @@ import path from 'path';
 import fs from 'fs';
 import { getUserByToken, Missing, Unauthorized } from '../utils/authUtils';
 import { DBClient } from '../utils/db';
+import { isFolder } from '../utils/FileUtils';
 
 const {
   FOLDER_PATH = '/tmp/files_manager',
@@ -128,13 +129,45 @@ async function getShow(req, res) {
 
 async function getIndex(req, res) {
   const token = req.headers['x-token'];
+  const { db } = await DBClient.getInstance();
+  const filesCollection = db.collection('files');
+  const {
+    parentId = 0,
+    page = '0',
+  } = req.query;
+  const limit = 20;
 
   // check of the given token have a valid user Id
+  let user;
   if (token) {
-    const user = await getUserByToken(token);
+    user = await getUserByToken(token);
     if (!user) return Unauthorized(res);
   } else return Unauthorized(res);
-  return null;
+  if (!isFolder(parentId)) return res.status(200).send([]);
+  const files = await filesCollection.aggregate([
+    {
+      $match: {
+        parentId: (parentId !== '0' ? parentId : 0),
+        userId: user._id.toString(),
+      },
+    },
+    { $skip: page * limit },
+    { $limit: limit },
+    {
+      $replaceRoot: {
+        newRoot: {
+          $mergeObjects: [{ id: '$_id' }, '$$ROOT'],
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        localPath: 0,
+      },
+    },
+  ]).toArray();
+  return res.status(200).send(files);
 }
 
 const FilesController = {
