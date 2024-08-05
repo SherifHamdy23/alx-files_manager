@@ -97,8 +97,9 @@ async function getShow(req, res) {
   const { db } = await DBClient.getInstance();
 
   // check of the given token have a valid user Id
+  let user;
   if (token) {
-    const user = await getUserByToken(token);
+    user = await getUserByToken(token);
     if (!user) return Unauthorized(res);
   } else return Unauthorized(res);
   let file = null;
@@ -106,6 +107,7 @@ async function getShow(req, res) {
   try {
     file = await db.collection('files').findOne({
       _id: new ObjectId(req.params.id),
+      userId: user._id.toString(),
     });
     if (file) {
       fileId = file._id;
@@ -114,6 +116,7 @@ async function getShow(req, res) {
       return res.status(200).send({ id: fileId, ...file });
     }
   } catch (err) {
+    // console.log(err)
     return res.status(404).send({ error: 'Not found' });
   }
   return res.status(404).send({ error: 'Not found' });
@@ -124,8 +127,9 @@ async function getIndex(req, res) {
   const { db } = await DBClient.getInstance();
 
   // check of the given token have a valid user Id
+  let user;
   if (token) {
-    const user = await getUserByToken(token);
+    user = await getUserByToken(token);
     if (!user) return Unauthorized(res);
   } else return Unauthorized(res);
 
@@ -135,7 +139,12 @@ async function getIndex(req, res) {
     page = 0,
   } = req.query;
   const files = await db.collection('files').aggregate([
-    { $match: { parentId: parentId !== '0' ? parentId : 0 } },
+    {
+      $match: {
+        parentId: parentId !== '0' ? parentId : 0,
+        userId: user._id.toString(),
+      },
+    },
     { $skip: page * limit },
     { $limit: limit },
     {
